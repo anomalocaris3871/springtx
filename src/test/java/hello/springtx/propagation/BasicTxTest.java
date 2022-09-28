@@ -1,6 +1,7 @@
 package hello.springtx.propagation;
 
 import lombok.extern.slf4j.Slf4j;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -9,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
 
 import javax.sql.DataSource;
@@ -95,6 +97,33 @@ public class BasicTxTest {
         log.info("inner.isNewTransaction()={}",inner.isNewTransaction());
         log.info("inner transaction commit");
         txManager.commit(inner);
+    }
+
+    @Test
+    void outer_rollback() {
+        log.info("outer transaction start");
+        TransactionStatus outer = txManager.getTransaction(new DefaultTransactionAttribute());
+
+
+        inner();
+
+        log.info("outer transaction rollback");
+        txManager.rollback(outer);
+    }
+
+    @Test
+    void inner_rollback() {
+        log.info("outer transaction start");
+        TransactionStatus outer = txManager.getTransaction(new DefaultTransactionAttribute());
+
+
+        log.info("inner transaction start");
+        TransactionStatus inner = txManager.getTransaction(new DefaultTransactionAttribute());
+        log.info("inner transaction rollback");
+        txManager.rollback(inner);
+
+        log.info("outer transaction commit");
+        Assertions.assertThatThrownBy(()-> txManager.commit(outer)).isInstanceOf(UnexpectedRollbackException.class);
     }
 
 }
