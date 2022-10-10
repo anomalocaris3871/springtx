@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.UnexpectedRollbackException;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,9 +14,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 class MemberServiceTest {
 
-    @Autowired MemberService memberService;
-    @Autowired MemberRepository memberRepository;
-    @Autowired LogRepository logRepository;
+    @Autowired
+    MemberService memberService;
+    @Autowired
+    MemberRepository memberRepository;
+    @Autowired
+    LogRepository logRepository;
 
     @Test
     public void outerTxOff_success() {
@@ -32,7 +36,7 @@ class MemberServiceTest {
     public void outerTxOff_fail() {
         String username = "logException_outerTxOff_fail";
 
-        assertThatThrownBy(()-> memberService.joinV1(username)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> memberService.joinV1(username)).isInstanceOf(RuntimeException.class);
 
         assertTrue(memberRepository.find(username).isPresent());
         assertTrue(logRepository.find(username).isEmpty());
@@ -41,6 +45,17 @@ class MemberServiceTest {
 
     @Test
     public void singleTx() {
+        String username = "singleTx";
+
+        memberService.joinV1(username);
+
+        assertTrue(memberRepository.find(username).isPresent());
+        assertTrue(logRepository.find(username).isPresent());
+
+    }
+
+    @Test
+    public void outerTxOn_success() {
         String username = "outerTxOn_success";
 
         memberService.joinV1(username);
@@ -48,5 +63,36 @@ class MemberServiceTest {
         assertTrue(memberRepository.find(username).isPresent());
         assertTrue(logRepository.find(username).isPresent());
 
+    }
+
+    @Test
+    public void outerTxOn_fail() {
+        String username = "logException_outerTxOn_fail";
+
+        assertThatThrownBy(() -> memberService.joinV1(username)).isInstanceOf(RuntimeException.class);
+
+        assertTrue(memberRepository.find(username).isEmpty());
+        assertTrue(logRepository.find(username).isEmpty());
+
+    }
+
+    @Test
+    void recoverException_fail() {
+        String username = "logException_outerTxOn_fail";
+
+        assertThatThrownBy(() -> memberService.joinV2(username)).isInstanceOf(UnexpectedRollbackException.class);
+
+        assertTrue(memberRepository.find(username).isEmpty());
+        assertTrue(logRepository.find(username).isEmpty());
+    }
+
+    @Test
+    void recoverException_success() {
+        String username = "logException_recoverException_success";
+
+        memberService.joinV2(username);
+
+        assertTrue(memberRepository.find(username).isPresent());
+        assertTrue(logRepository.find(username).isEmpty());
     }
 }
